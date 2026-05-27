@@ -8,8 +8,15 @@ interface EventTimelineProps {
 }
 
 export const EventTimeline: React.FC<EventTimelineProps> = ({ events }) => {
-  const [selectedMonth, setSelectedMonth] = useState(1); // Default to February (1)
-  const [selectedYear, setSelectedYear] = useState(2026);
+  const defaultDate = useMemo(() => {
+    const d = new Date();
+    if (d.getFullYear() < 2025) d.setFullYear(2025);
+    if (d.getFullYear() > 2030) d.setFullYear(2030);
+    return d;
+  }, []);
+
+  const [selectedMonth, setSelectedMonth] = useState(defaultDate.getMonth()); // Default to current month
+  const [selectedYear, setSelectedYear] = useState(defaultDate.getFullYear()); // Default to current year
 
   const months = [
     "January", "February", "March", "April", "May", "June",

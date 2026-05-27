@@ -10,9 +10,16 @@ interface EventCalendarViewProps {
 }
 
 export const EventCalendarView: React.FC<EventCalendarViewProps> = ({ events, isAdmin, onEditEvent }) => {
-  const [selectedYear, setSelectedYear] = useState(2026);
-  const [selectedMonth, setSelectedMonth] = useState(4); // Default to May 2026 (4)
-  const [selectedDay, setSelectedDay] = useState<number>(26); // Default to 26th of May
+  const defaultDate = useMemo(() => {
+    const d = new Date();
+    if (d.getFullYear() < 2025) d.setFullYear(2025);
+    if (d.getFullYear() > 2030) d.setFullYear(2030);
+    return d;
+  }, []);
+
+  const [selectedYear, setSelectedYear] = useState(defaultDate.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(defaultDate.getMonth());
+  const [selectedDay, setSelectedDay] = useState<number>(defaultDate.getDate());
 
   const months = [
     "January", "February", "March", "April", "May", "June",
