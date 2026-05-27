@@ -44,6 +44,17 @@ export const EventDashboard: React.FC<EventDashboardProps> = ({
   // System time from game context (defined as May 26, 2026, 11:54)
   const systemTime = useMemo(() => new Date("2026-05-26T11:54:43"), []);
 
+  // Helper to determine active status of a single event card
+  const checkEventLiveStatus = (event: GameEvent) => {
+    const startRange = new Date(systemTime.getTime() - 86400000); // 1 day pad
+    const endRange = new Date(systemTime.getTime() + 86400000);
+    const occurrences = getEventActiveWindows(event, startRange, endRange);
+    
+    // Find matching live occurrence
+    const liveOcc = occurrences.find(occ => systemTime >= occ.timeStart && systemTime <= occ.timeEnd);
+    return liveOcc || null;
+  };
+
   const [sortBy, setSortBy] = useState<"id" | "live" | "name">("live");
 
   const sortedFilteredEvents = useMemo(() => {
@@ -94,19 +105,6 @@ export const EventDashboard: React.FC<EventDashboardProps> = ({
     });
     return Array.from(patches).sort();
   }, [events]);
-
-
-
-  // Helper to determine active status of a single event card
-  const checkEventLiveStatus = (event: GameEvent) => {
-    const startRange = new Date(systemTime.getTime() - 86400000); // 1 day pad
-    const endRange = new Date(systemTime.getTime() + 86400000);
-    const occurrences = getEventActiveWindows(event, startRange, endRange);
-    
-    // Find matching live occurrence
-    const liveOcc = occurrences.find(occ => systemTime >= occ.timeStart && systemTime <= occ.timeEnd);
-    return liveOcc || null;
-  };
 
 // Beautiful rotating fallback color configurations for custom event types
 const customColors = [
