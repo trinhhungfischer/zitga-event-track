@@ -31,8 +31,8 @@ A premium, interactive web application built with **React**, **TypeScript**, and
    - Drag-and-drop CSV importer, CSV exporter, and published live Google Sheets CSV connectors.
 
 6. **Admin Credentials Lock:**
-   - Full CRUD actions, duplicate templates, import files, and database resets are locked behind authorization credentials:
-     * **standard admin credentials. Contact lead designer/administrator.
+   - Full CRUD actions, duplicate templates, import files, and database resets are locked behind standard admin credentials.
+   - Contact the lead game designer or administrator to obtain the login details.
 
 ---
 
