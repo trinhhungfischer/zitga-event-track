@@ -1,0 +1,17 @@
+# Node dependencies
+event-track-ui/node_modules/
+event-track-ui/dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
