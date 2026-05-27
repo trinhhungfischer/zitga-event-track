@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Search, Plus, Calendar, Edit2, Copy, Trash2, Shield, Layers, Power, Ban } from "lucide-react";
 import type { GameEvent } from "../types";
 import { getEventActiveWindows } from "../utils/dateUtils";
@@ -43,6 +43,24 @@ export const EventDashboard: React.FC<EventDashboardProps> = ({
 
   // System time from game context (defined as May 26, 2026, 11:54)
   const systemTime = useMemo(() => new Date("2026-05-26T11:54:43"), []);
+
+  const [sortBy, setSortBy] = useState<"id" | "live" | "name">("live");
+
+  const sortedFilteredEvents = useMemo(() => {
+    const list = [...filteredEvents];
+    if (sortBy === "live") {
+      return list.sort((a, b) => {
+        const aLive = checkEventLiveStatus(a) !== null;
+        const bLive = checkEventLiveStatus(b) !== null;
+        if (aLive && !bLive) return -1;
+        if (!aLive && bLive) return 1;
+        return a.id - b.id; // fallback to ID
+      });
+    } else if (sortBy === "name") {
+      return list.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return list.sort((a, b) => a.id - b.id);
+  }, [filteredEvents, sortBy, systemTime]);
 
   // 1. Calculate statistics
   const stats = useMemo(() => {
@@ -205,6 +223,17 @@ const getCustomColorSet = (type: string) => {
             <option value="Manual">Manual Event (Season)</option>
           </select>
 
+          {/* Setup sorting */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as "id" | "live" | "name")}
+            className="px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs font-semibold text-slate-300 focus:outline-none focus:border-violet-500 cursor-pointer"
+          >
+            <option value="live">⚡ Live Events First</option>
+            <option value="id">Default (Sort by ID)</option>
+            <option value="name">🔤 Name (A - Z)</option>
+          </select>
+
           {/* Event Categories Toggle Pills (Multi-Select) */}
           <div className="flex flex-wrap items-center gap-1.5 border-l border-white/10 pl-3">
             <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mr-1">Categories:</span>
@@ -274,7 +303,7 @@ const getCustomColorSet = (type: string) => {
       </div>
 
       {/* 3. Event Modules Grid view */}
-      {filteredEvents.length === 0 ? (
+      {sortedFilteredEvents.length === 0 ? (
         <div className="glass-panel py-16 text-center text-slate-500 rounded-3xl border border-white/5 space-y-2">
           <Ban size={40} className="mx-auto text-slate-600 mb-2" />
           <p className="font-semibold text-white">No game modules match your criteria</p>
@@ -282,7 +311,7 @@ const getCustomColorSet = (type: string) => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredEvents.map((event) => {
+          {sortedFilteredEvents.map((event) => {
             const liveOcc = checkEventLiveStatus(event);
             const isLive = !!liveOcc;
             const categoryColors = getTypeBadgeClass(event.type);
