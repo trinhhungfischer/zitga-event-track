@@ -135,6 +135,7 @@ export function getEventActiveWindows(
           timeStart: oStart,
           timeEnd: oEnd,
           isOverride: true,
+          lockedDuration: override.lockedDuration,
         });
       }
     }
@@ -163,6 +164,7 @@ export function getEventActiveWindows(
           timeStart: new Date(currentStart.getTime()),
           timeEnd: currentEnd,
           duration: durationSeconds,
+          lockedDuration: rule.lockedDuration,
         });
       }
 

@@ -41,6 +41,7 @@ export const EventForm: React.FC<EventFormProps> = ({ isOpen, event, isAdmin, on
   const [loopSeasonStart, setLoopSeasonStart] = useState(1);
   const [loopIntervals, setLoopIntervals] = useState<number[]>([2]);
   const [loopDataIds, setLoopDataIds] = useState<number[]>([0]);
+  const [loopLockedDuration, setLoopLockedDuration] = useState<number | undefined>(undefined);
   
   // Loop Override Subform State
   const [hasOverride, setHasOverride] = useState(false);
@@ -48,6 +49,7 @@ export const EventForm: React.FC<EventFormProps> = ({ isOpen, event, isAdmin, on
   const [overrideEnd, setOverrideEnd] = useState("2026-01-11T23:59");
   const [overrideSeasonNum, setOverrideSeasonNum] = useState(1);
   const [overrideDataId, setOverrideDataId] = useState(0);
+  const [overrideLockedDuration, setOverrideLockedDuration] = useState<number | undefined>(undefined);
 
   // Manual Config State
   const [manualSeasons, setManualSeasons] = useState<ManualSeason[]>([]);
@@ -93,6 +95,8 @@ export const EventForm: React.FC<EventFormProps> = ({ isOpen, event, isAdmin, on
       setRealName("");
       setIaps("");
       setCurrentSeason("");
+      setLoopLockedDuration(undefined);
+      setOverrideLockedDuration(undefined);
       
       // Default configurations
       const defaultLoopJson = '{"rule":{"timeStart":20260112000001,"duration":1209598,"seasonStart":2,"intervals":[2],"dataIds":[0]},"overrideSeason":{"timeStart":20251223235959,"timeEnd":20260111235959,"season":1,"dataId":0}}';
@@ -124,6 +128,7 @@ export const EventForm: React.FC<EventFormProps> = ({ isOpen, event, isAdmin, on
           setLoopSeasonStart(rule.seasonStart);
           setLoopIntervals(rule.intervals || [2]);
           setLoopDataIds(rule.dataIds || [0]);
+          setLoopLockedDuration(rule.lockedDuration);
         }
 
         if (parsed.overrideSeason) {
@@ -133,8 +138,10 @@ export const EventForm: React.FC<EventFormProps> = ({ isOpen, event, isAdmin, on
           setOverrideEnd(toLocalISOString(parseGameDate(override.timeEnd)));
           setOverrideSeasonNum(override.season);
           setOverrideDataId(override.dataId);
+          setOverrideLockedDuration(override.lockedDuration);
         } else {
           setHasOverride(false);
+          setOverrideLockedDuration(undefined);
         }
       } else {
         if (parsed.manualSeason && Array.isArray(parsed.manualSeason)) {
@@ -168,7 +175,7 @@ export const EventForm: React.FC<EventFormProps> = ({ isOpen, event, isAdmin, on
   ): string => {
     if (isLoop) {
       const startNum = fromISOToGameDate(loopData?.timeStart || loopTimeStart);
-      const rule = {
+      const rule: any = {
         timeStart: startNum,
         duration: loopData?.duration || loopDurationSec,
         seasonStart: loopData?.seasonStart || loopSeasonStart,
@@ -176,16 +183,25 @@ export const EventForm: React.FC<EventFormProps> = ({ isOpen, event, isAdmin, on
         dataIds: loopData?.dataIds || loopDataIds
       };
 
+      const lD = loopData?.lockedDuration !== undefined ? loopData.lockedDuration : loopLockedDuration;
+      if (lD) {
+        rule.lockedDuration = lD;
+      }
+
       const compiled: any = { rule };
 
       const overrideEnabled = loopData?.hasOverride !== undefined ? loopData.hasOverride : hasOverride;
       if (overrideEnabled) {
+        const oD = loopData?.overrideLockedDuration !== undefined ? loopData.overrideLockedDuration : overrideLockedDuration;
         compiled.overrideSeason = {
           timeStart: fromISOToGameDate(loopData?.overrideStart || overrideStart),
           timeEnd: fromISOToGameDate(loopData?.overrideEnd || overrideEnd),
           season: loopData?.overrideSeasonNum || overrideSeasonNum,
           dataId: loopData?.overrideDataId || overrideDataId
         };
+        if (oD) {
+          compiled.overrideSeason.lockedDuration = oD;
+        }
       }
 
       return JSON.stringify(compiled);
@@ -205,11 +221,13 @@ export const EventForm: React.FC<EventFormProps> = ({ isOpen, event, isAdmin, on
       seasonStart: loopSeasonStart,
       intervals: loopIntervals,
       dataIds: loopDataIds,
+      lockedDuration: loopLockedDuration,
       hasOverride,
       overrideStart,
       overrideEnd,
       overrideSeasonNum,
       overrideDataId,
+      overrideLockedDuration,
       ...updates
     };
 
@@ -534,10 +552,10 @@ export const EventForm: React.FC<EventFormProps> = ({ isOpen, event, isAdmin, on
                         </div>
                       </div>
 
-                      {/* Loop Season Start & dataIds */}
-                      <div className="grid grid-cols-2 gap-4">
+                      {/* Loop Season Start, dataIds & Lock Sec */}
+                      <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-1">
-                          <label className="text-xs text-slate-400">Starting Season Index</label>
+                          <label className="text-[10px] text-slate-400 block truncate">Season Index</label>
                           <input
                             type="number"
                             min={1}
@@ -547,11 +565,11 @@ export const EventForm: React.FC<EventFormProps> = ({ isOpen, event, isAdmin, on
                               setLoopSeasonStart(val);
                               handleLoopFieldChange({ seasonStart: val });
                             }}
-                            className="w-full px-3 py-2 bg-slate-900 border border-white/10 rounded-lg text-sm focus:outline-none focus:border-violet-500 text-white"
+                            className="w-full px-2.5 py-2 bg-slate-900 border border-white/10 rounded-lg text-xs focus:outline-none focus:border-violet-500 text-white"
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-xs text-slate-400">Data IDs (comma list)</label>
+                          <label className="text-[10px] text-slate-400 block truncate">Data IDs (comma)</label>
                           <input
                             type="text"
                             value={loopDataIds.join(", ")}
@@ -560,8 +578,24 @@ export const EventForm: React.FC<EventFormProps> = ({ isOpen, event, isAdmin, on
                               setLoopDataIds(arr.length ? arr : [0]);
                               handleLoopFieldChange({ dataIds: arr.length ? arr : [0] });
                             }}
-                            className="w-full px-3 py-2 bg-slate-900 border border-white/10 rounded-lg text-xs focus:outline-none focus:border-violet-500 text-white font-mono-custom"
-                            placeholder="e.g. 0, 1, 2"
+                            className="w-full px-2.5 py-2 bg-slate-900 border border-white/10 rounded-lg text-[11px] focus:outline-none focus:border-violet-500 text-white font-mono-custom"
+                            placeholder="e.g. 0, 1"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-400 block truncate">Lock Sec (opt)</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={loopLockedDuration || ""}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value);
+                              const nextVal = val > 0 ? val : undefined;
+                              setLoopLockedDuration(nextVal);
+                              handleLoopFieldChange({ lockedDuration: nextVal });
+                            }}
+                            className="w-full px-2.5 py-2 bg-slate-900 border border-white/10 rounded-lg text-xs focus:outline-none focus:border-violet-500 text-white"
+                            placeholder="e.g. 172800"
                           />
                         </div>
                       </div>
@@ -627,7 +661,7 @@ export const EventForm: React.FC<EventFormProps> = ({ isOpen, event, isAdmin, on
                               />
                             </div>
                             <div className="space-y-1">
-                              <label className="text-slate-400">Override Season ID</label>
+                              <label className="text-[10px] text-slate-400 block truncate">Override Season ID</label>
                               <input
                                 type="number"
                                 value={overrideSeasonNum}
@@ -640,7 +674,7 @@ export const EventForm: React.FC<EventFormProps> = ({ isOpen, event, isAdmin, on
                               />
                             </div>
                             <div className="space-y-1">
-                              <label className="text-slate-400">Override Data ID</label>
+                              <label className="text-[10px] text-slate-400 block truncate">Override Data ID</label>
                               <input
                                 type="number"
                                 value={overrideDataId}
@@ -650,6 +684,22 @@ export const EventForm: React.FC<EventFormProps> = ({ isOpen, event, isAdmin, on
                                   handleLoopFieldChange({ overrideDataId: val });
                                 }}
                                 className="w-full px-2.5 py-1.5 bg-slate-900 border border-white/10 rounded-md focus:outline-none text-white text-xs"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 block truncate">Lock Sec (opt)</label>
+                              <input
+                                type="number"
+                                min={0}
+                                value={overrideLockedDuration || ""}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value);
+                                  const nextVal = val > 0 ? val : undefined;
+                                  setOverrideLockedDuration(nextVal);
+                                  handleLoopFieldChange({ overrideLockedDuration: nextVal });
+                                }}
+                                className="w-full px-2.5 py-1.5 bg-slate-900 border border-white/10 rounded-md focus:outline-none text-white text-xs"
+                                placeholder="e.g. 172800"
                               />
                             </div>
                           </div>

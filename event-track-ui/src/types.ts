@@ -5,12 +5,14 @@ export interface LoopConfig {
     seasonStart: number;
     intervals: number[];
     dataIds: number[];
+    lockedDuration?: number;
   };
   overrideSeason?: {
     timeStart: number;
     timeEnd: number;
     season: number;
     dataId: number;
+    lockedDuration?: number;
   };
 }
 
