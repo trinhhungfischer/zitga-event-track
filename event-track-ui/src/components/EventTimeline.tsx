@@ -17,59 +17,98 @@ export const EventTimeline: React.FC<EventTimelineProps> = ({ events }) => {
 
   const [selectedMonth, setSelectedMonth] = useState(defaultDate.getMonth()); // Default to current month
   const [selectedYear, setSelectedYear] = useState(defaultDate.getFullYear()); // Default to current year
+  const [viewSpan, setViewSpan] = useState<number>(1); // Number of months to show: 1, 2, or 3
 
   const months = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
   ];
 
-  // 1. Calculate boundaries of selected month
+  // 1. Calculate boundaries of selected timeline range
   const monthStart = useMemo(() => new Date(selectedYear, selectedMonth, 1, 0, 0, 0), [selectedMonth, selectedYear]);
-  const monthEnd = useMemo(() => new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59), [selectedMonth, selectedYear]);
-  const daysInMonth = useMemo(() => monthEnd.getDate(), [monthEnd]);
+  const monthEnd = useMemo(() => new Date(selectedYear, selectedMonth + viewSpan, 0, 23, 59, 59), [selectedMonth, selectedYear, viewSpan]);
 
-  // 2. Generate occurrences for all events inside this month window
+  // Generate date array for each day in range
+  const daysArray = useMemo(() => {
+    const arr: Date[] = [];
+    const current = new Date(monthStart);
+    while (current <= monthEnd) {
+      arr.push(new Date(current));
+      current.setDate(current.getDate() + 1);
+    }
+    return arr;
+  }, [monthStart, monthEnd]);
+
+  const totalDays = useMemo(() => daysArray.length, [daysArray]);
+
+  // 2. Generate occurrences for all events inside this timeline window
   const eventOccurrencesMap = useMemo(() => {
     const map: { [eventId: number]: ScheduledOccurrence[] } = {};
     for (const event of events) {
       // Calculate schedule with padding to ensure overlaps at boundaries show up
-      const padStart = new Date(selectedYear, selectedMonth - 1, 15);
-      const padEnd = new Date(selectedYear, selectedMonth + 1, 15);
+      const padStart = new Date(monthStart.getTime() - 15 * 86400000);
+      const padEnd = new Date(monthEnd.getTime() + 15 * 86400000);
       const occurrences = getEventActiveWindows(event, padStart, padEnd);
       
-      // Filter occurrences that overlap with current month
+      // Filter occurrences that overlap with current timeline range
       map[event.id] = occurrences.filter(occ => {
         return occ.timeEnd >= monthStart && occ.timeStart <= monthEnd;
       });
     }
     return map;
-  }, [events, selectedMonth, selectedYear, monthStart, monthEnd]);
+  }, [events, monthStart, monthEnd]);
 
   const handlePrevMonth = () => {
-    setSelectedMonth(prev => (prev === 0 ? 11 : prev - 1));
+    setSelectedMonth(prev => {
+      if (prev === 0) {
+        if (selectedYear > 2025) {
+          setSelectedYear(selectedYear - 1);
+          return 11;
+        }
+        return 0;
+      }
+      return prev - 1;
+    });
   };
 
   const handleNextMonth = () => {
-    setSelectedMonth(prev => (prev === 11 ? 0 : prev + 1));
+    setSelectedMonth(prev => {
+      if (prev === 11) {
+        if (selectedYear < 2030) {
+          setSelectedYear(selectedYear + 1);
+          return 0;
+        }
+        return 11;
+      }
+      return prev + 1;
+    });
   };
 
-// Beautiful rotating fallback color configurations for custom event types
-const customColors = [
-  { bg: "bg-cyan-600/80 border-cyan-500 hover:bg-cyan-600", text: "text-cyan-200", glow: "shadow-cyan-600/10", badge: "bg-cyan-500/20 text-cyan-400" },
-  { bg: "bg-fuchsia-600/80 border-fuchsia-500 hover:bg-fuchsia-600", text: "text-fuchsia-200", glow: "shadow-fuchsia-600/10", badge: "bg-fuchsia-500/20 text-fuchsia-400" },
-  { bg: "bg-pink-600/80 border-pink-500 hover:bg-pink-600", text: "text-pink-200", glow: "shadow-pink-600/10", badge: "bg-pink-500/20 text-pink-400" },
-  { bg: "bg-orange-600/80 border-orange-500 hover:bg-orange-600", text: "text-orange-200", glow: "shadow-orange-600/10", badge: "bg-orange-500/20 text-orange-400" },
-  { bg: "bg-teal-600/80 border-teal-500 hover:bg-teal-600", text: "text-teal-200", glow: "shadow-teal-600/10", badge: "bg-teal-500/20 text-teal-400" },
-];
+  const rangeLabel = useMemo(() => {
+    if (viewSpan === 1) {
+      return months[selectedMonth];
+    }
+    const endMonthIdx = (selectedMonth + viewSpan - 1) % 12;
+    return `${months[selectedMonth].slice(0, 3)} - ${months[endMonthIdx].slice(0, 3)}`;
+  }, [selectedMonth, viewSpan, months]);
 
-const getCustomColorSet = (type: string) => {
-  let hash = 0;
-  for (let i = 0; i < type.length; i++) {
-    hash = type.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const idx = Math.abs(hash) % customColors.length;
-  return customColors[idx];
-};
+  // Beautiful rotating fallback color configurations for custom event types
+  const customColors = [
+    { bg: "bg-cyan-600/80 border-cyan-500 hover:bg-cyan-600", text: "text-cyan-200", glow: "shadow-cyan-600/10", badge: "bg-cyan-500/20 text-cyan-400" },
+    { bg: "bg-fuchsia-600/80 border-fuchsia-500 hover:bg-fuchsia-600", text: "text-fuchsia-200", glow: "shadow-fuchsia-600/10", badge: "bg-fuchsia-500/20 text-fuchsia-400" },
+    { bg: "bg-pink-600/80 border-pink-500 hover:bg-pink-600", text: "text-pink-200", glow: "shadow-pink-600/10", badge: "bg-pink-500/20 text-pink-400" },
+    { bg: "bg-orange-600/80 border-orange-500 hover:bg-orange-600", text: "text-orange-200", glow: "shadow-orange-600/10", badge: "bg-orange-500/20 text-orange-400" },
+    { bg: "bg-teal-600/80 border-teal-500 hover:bg-teal-600", text: "text-teal-200", glow: "shadow-teal-600/10", badge: "bg-teal-500/20 text-teal-400" },
+  ];
+
+  const getCustomColorSet = (type: string) => {
+    let hash = 0;
+    for (let i = 0; i < type.length; i++) {
+      hash = type.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const idx = Math.abs(hash) % customColors.length;
+    return customColors[idx];
+  };
 
   // Helper to resolve event category color classes
   const getCategoryStyles = (type: string) => {
@@ -114,9 +153,6 @@ const getCustomColorSet = (type: string) => {
     }
   };
 
-  // Helper to determine day columns width inside table header
-  const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
-
   return (
     <div className="glass-panel p-6 rounded-3xl border border-white/5 space-y-6">
       
@@ -133,69 +169,95 @@ const getCustomColorSet = (type: string) => {
           <p className="text-xs text-slate-400">Interactive Gantt-style schedule visualizer for planning live ops</p>
         </div>
 
-        {/* Month & Year Selector */}
-        <div className="flex items-center bg-slate-900 border border-white/10 rounded-xl p-1 shadow-inner gap-1">
-          <button
-            onClick={handlePrevMonth}
-            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
-          >
-            <ChevronLeft size={16} />
-          </button>
-          
-          <span className="w-24 text-center text-sm font-semibold text-white font-display">
-            {months[selectedMonth]}
-          </span>
-
-          <button
-            onClick={handleNextMonth}
-            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
-          >
-            <ChevronRight size={16} />
-          </button>
-
-          <div className="h-6 w-[1px] bg-white/10 mx-1" />
-
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-            className="bg-transparent border-0 text-sm font-semibold text-white focus:outline-none pr-1.5 cursor-pointer font-mono-custom font-bold"
-          >
-            {[2025, 2026, 2027, 2028, 2029, 2030].map(y => (
-              <option key={y} value={y} className="bg-slate-900 text-white font-semibold">{y}</option>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* View Span Selector */}
+          <div className="flex items-center bg-slate-900 border border-white/10 rounded-xl p-1 shadow-inner text-xs gap-1">
+            <span className="text-[10px] text-slate-500 font-semibold px-2 uppercase shrink-0">Span:</span>
+            {[1, 2, 3].map(span => (
+              <button
+                key={span}
+                onClick={() => setViewSpan(span)}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
+                  viewSpan === span
+                    ? "bg-violet-600 border-violet-500 text-white font-bold"
+                    : "bg-slate-950 border-white/5 text-slate-500 hover:text-slate-300"
+                }`}
+              >
+                {span} {span === 1 ? "Month" : "Months"}
+              </button>
             ))}
-          </select>
+          </div>
+
+          {/* Month & Year Selector */}
+          <div className="flex items-center bg-slate-900 border border-white/10 rounded-xl p-1 shadow-inner gap-1">
+            <button
+              onClick={handlePrevMonth}
+              className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            
+            <span className="w-28 text-center text-sm font-semibold text-white font-display truncate">
+              {rangeLabel}
+            </span>
+
+            <button
+              onClick={handleNextMonth}
+              className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+            >
+              <ChevronRight size={16} />
+            </button>
+
+            <div className="h-6 w-[1px] bg-white/10 mx-1" />
+
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              className="bg-transparent border-0 text-sm font-semibold text-white focus:outline-none pr-1.5 cursor-pointer font-mono-custom font-bold"
+            >
+              {[2025, 2026, 2027, 2028, 2029, 2030].map(y => (
+                <option key={y} value={y} className="bg-slate-900 text-white font-semibold">{y}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
       {/* Gantt Timeline visualization */}
       <div className="overflow-x-auto border border-white/10 rounded-2xl bg-slate-950/20">
-        <div className="min-w-[980px] divide-y divide-white/5">
+        <div 
+          className="divide-y divide-white/5"
+          style={{ minWidth: viewSpan === 1 ? "980px" : viewSpan === 2 ? "1600px" : "2400px" }}
+        >
           
           {/* Calendar Header Day markers */}
           <div className="flex items-stretch bg-slate-900/60 font-mono-custom text-[10px] font-semibold text-slate-400 h-10">
             <div className="w-56 px-4 flex items-center shrink-0 border-r border-white/10 text-slate-300 font-display text-xs">
               Event Module
             </div>
-            <div className="flex-1 grid grid-cols-12 relative">
-              {daysArray.map((day) => {
-                const dayDate = new Date(selectedYear, selectedMonth, day);
+            <div className="flex-1 relative">
+              {daysArray.map((dayDate, idx) => {
                 const isWeekend = dayDate.getDay() === 0 || dayDate.getDay() === 6;
+                const isFirstOfMonth = dayDate.getDate() === 1;
+                const showMonthLabel = isFirstOfMonth || idx === 0;
+
                 return (
                   <div
-                    key={day}
+                    key={idx}
                     style={{
-                      gridColumn: `span 1`,
-                      width: `${100 / daysInMonth}%`,
                       position: "absolute",
-                      left: `${((day - 1) / daysInMonth) * 100}%`,
+                      left: `${(idx / totalDays) * 100}%`,
+                      width: `${(1 / totalDays) * 100}%`,
                       height: "100%"
                     }}
                     className={`flex flex-col items-center justify-center border-r border-white/5 h-full ${
                       isWeekend ? "bg-white/[0.015]" : ""
-                    }`}
+                    } ${isFirstOfMonth ? "border-l border-l-violet-500/40" : ""}`}
                   >
-                    <span>{day}</span>
-                    <span className="text-[8px] text-slate-500 uppercase">
+                    <span className={`text-[10px] leading-none mb-0.5 ${showMonthLabel ? "text-violet-400 font-bold" : ""}`}>
+                      {showMonthLabel ? `${months[dayDate.getMonth()].slice(0, 3)} ` : ""}{dayDate.getDate()}
+                    </span>
+                    <span className="text-[8px] text-slate-500 uppercase leading-none">
                       {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"][dayDate.getDay()]}
                     </span>
                   </div>
@@ -236,19 +298,19 @@ const getCustomColorSet = (type: string) => {
                     
                     {/* Vertical grid lines helper */}
                     <div className="absolute inset-0 flex pointer-events-none">
-                      {daysArray.map((day) => {
-                        const dayDate = new Date(selectedYear, selectedMonth, day);
+                      {daysArray.map((dayDate, idx) => {
                         const isWeekend = dayDate.getDay() === 0 || dayDate.getDay() === 6;
+                        const isFirstOfMonth = dayDate.getDate() === 1;
                         return (
                           <div
-                            key={day}
+                            key={idx}
                             style={{
-                              left: `${((day - 1) / daysInMonth) * 100}%`,
-                              width: `${100 / daysInMonth}%`
+                              left: `${(idx / totalDays) * 100}%`,
+                              width: `${(1 / totalDays) * 100}%`
                             }}
                             className={`absolute h-full border-r border-white/5 ${
                               isWeekend ? "bg-white/[0.015]" : ""
-                            }`}
+                            } ${isFirstOfMonth ? "border-l border-l-violet-500/20" : ""}`}
                           />
                         );
                       })}
@@ -256,7 +318,7 @@ const getCustomColorSet = (type: string) => {
 
                     {/* Active capsule blocks */}
                     {occurrences.map((occ, oIdx) => {
-                      // Calculate coordinates in percentage inside the month
+                      // Calculate coordinates in percentage inside the timeline range
                       const tStart = occ.timeStart.getTime();
                       const tEnd = occ.timeEnd.getTime();
                       const limitStart = monthStart.getTime();
@@ -265,9 +327,9 @@ const getCustomColorSet = (type: string) => {
                       const clampStart = Math.max(tStart, limitStart);
                       const clampEnd = Math.min(tEnd, limitEnd);
                       
-                      const monthDuration = limitEnd - limitStart;
-                      const offsetPercent = ((clampStart - limitStart) / monthDuration) * 100;
-                      const widthPercent = ((clampEnd - clampStart) / monthDuration) * 100;
+                      const totalDuration = limitEnd - limitStart;
+                      const offsetPercent = ((clampStart - limitStart) / totalDuration) * 100;
+                      const widthPercent = ((clampEnd - clampStart) / totalDuration) * 100;
 
                       return (
                         <div
@@ -300,25 +362,25 @@ const getCustomColorSet = (type: string) => {
 
                             <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
                               <div>
-                                <span className="text-slate-500">Starts:</span>
+                                <span className="text-slate-500 text-[10px]">Starts:</span>
                                 <div className="text-slate-300 font-mono-custom font-semibold">
                                   {toFriendlyString(occ.timeStart)}
                                 </div>
                               </div>
                               <div>
-                                <span className="text-slate-500">Ends:</span>
+                                <span className="text-slate-500 text-[10px]">Ends:</span>
                                 <div className="text-slate-300 font-mono-custom font-semibold">
                                   {toFriendlyString(occ.timeEnd)}
                                 </div>
                               </div>
                               <div className="border-t border-white/5 pt-1">
-                                <span className="text-slate-500">Duration:</span>
+                                <span className="text-slate-500 text-[10px]">Duration:</span>
                                 <div className="text-indigo-400 font-semibold">
                                   {occ.duration ? formatSecondsToDuration(occ.duration) : event.durationStr}
                                 </div>
                               </div>
                               <div className="border-t border-white/5 pt-1">
-                                <span className="text-slate-500">Content Data ID:</span>
+                                <span className="text-slate-500 text-[10px]">Content Data ID:</span>
                                 <div className="text-emerald-400 font-semibold font-mono-custom">
                                   dataId: {occ.dataId}
                                 </div>
