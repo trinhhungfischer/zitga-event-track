@@ -210,12 +210,12 @@ const getCustomColorSet = (type: string) => {
               No events to display in the calendar. Add an event to see it mapped out.
             </div>
           ) : (
-            events.map((event) => {
+            events.map((event, eventIdx) => {
               const occurrences = eventOccurrencesMap[event.id] || [];
               const colors = getCategoryStyles(event.type);
 
               return (
-                <div key={event.id} className="flex items-stretch min-h-[52px] group hover:bg-white/[0.01] transition-colors">
+                <div key={event.id} className="flex items-stretch min-h-[52px] group hover:bg-white/[0.01] transition-colors relative hover:z-30">
                   {/* Event labels column */}
                   <div className="w-56 px-4 py-2 border-r border-white/10 flex flex-col justify-center shrink-0">
                     <span className="text-xs font-semibold text-white truncate group-hover:text-violet-400 transition-colors">
@@ -286,7 +286,9 @@ const getCustomColorSet = (type: string) => {
                           </span>
 
                           {/* Complex Hover Tooltip details card */}
-                          <div className="invisible group-hover/capsule:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 glass-panel p-4 rounded-xl border border-white/15 text-slate-300 font-normal text-[11px] shadow-2xl space-y-2 z-50 animate-float pointer-events-none">
+                          <div className={`invisible group-hover/capsule:visible absolute left-1/2 -translate-x-1/2 w-72 glass-panel p-4 rounded-xl border border-white/15 text-slate-300 font-normal text-[11px] shadow-2xl space-y-2 z-50 animate-float pointer-events-none ${
+                            eventIdx < 3 ? "top-full mt-2" : "bottom-full mb-2"
+                          }`}>
                             <div className="flex items-center justify-between border-b border-white/5 pb-1">
                               <span className="font-semibold text-white truncate max-w-[160px] text-xs">
                                 {event.name}

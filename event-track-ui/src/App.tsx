@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Layers, Calendar, FileText, RefreshCw, Plus, CheckCircle, Info, X } from "lucide-react";
 import type { GameEvent } from "./types";
 import { initialEvents } from "./utils/eventData";
@@ -30,20 +30,28 @@ function App() {
     return Array.from(categoriesSet);
   }, [events]);
 
-  // Automatically select new categories when they appear
+  const knownCategoriesRef = useRef<string[]>([]);
+
+  // Automatically select NEW categories when they are created
   useEffect(() => {
     if (events.length > 0) {
-      setSelectedTypes(prev => {
-        const next = [...prev];
-        let changed = false;
-        allCategories.forEach((cat: string) => {
-          if (!next.includes(cat)) {
-            next.push(cat);
-            changed = true;
-          }
+      const prevKnown = knownCategoriesRef.current;
+      const newCats = allCategories.filter(cat => !prevKnown.includes(cat));
+
+      if (newCats.length > 0) {
+        setSelectedTypes(prev => {
+          const next = [...prev];
+          let changed = false;
+          newCats.forEach((cat: string) => {
+            if (!next.includes(cat)) {
+              next.push(cat);
+              changed = true;
+            }
+          });
+          return changed ? next : prev;
         });
-        return changed ? next : prev;
-      });
+      }
+      knownCategoriesRef.current = allCategories;
     }
   }, [allCategories, events.length]);
   
