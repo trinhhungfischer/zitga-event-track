@@ -86,7 +86,28 @@ function App() {
     localStorage.setItem("game_events_config", JSON.stringify(sorted));
   };
 
-  const syncWithGoogleSheet = async (url: string) => {
+  const toHex = (str: string): string => {
+    return Array.from(str)
+      .map(c => c.charCodeAt(0).toString(16).padStart(2, "0"))
+      .join("");
+  };
+
+  const fromHex = (hex: string): string => {
+    try {
+      const cleanHex = hex.trim();
+      let raw = cleanHex;
+      if (raw.startsWith('"') && raw.endsWith('"')) {
+        raw = raw.slice(1, -1);
+      }
+      if (!/^[0-9a-fA-F]+$/.test(raw)) return raw;
+      const matched = raw.match(/.{1,2}/g);
+      return matched ? matched.map(byte => String.fromCharCode(parseInt(byte, 16))).join("") : raw;
+    } catch (e) {
+      return hex;
+    }
+  };
+
+  const syncWithGoogleSheet = async (url: string, propagateToCloud = false) => {
     if (!url.trim()) return false;
     setIsAutoSyncing(true);
     try {
@@ -110,6 +131,21 @@ function App() {
 
       saveEventsList(imported);
       localStorage.setItem("google_sheet_sync_url", cleanUrl);
+      setGoogleSheetUrl(cleanUrl);
+
+      // Propagate the new URL to the cloud key-value store if requested (Admin action)
+      if (propagateToCloud && isAdmin) {
+        try {
+          const hexUrl = toHex(cleanUrl);
+          await fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/9z9a0g3w/active_sheet_url/${hexUrl}`, {
+            method: "POST"
+          });
+          console.log("Successfully propagated new Google Sheets URL to cloud database.");
+        } catch (e) {
+          console.error("Failed to propagate new URL to cloud:", e);
+        }
+      }
+
       showNotice(`Auto-synchronized ${imported.length} events from Google Sheets!`);
       return true;
     } catch (err) {
@@ -123,6 +159,7 @@ function App() {
 
   // 1. Initial Load from localStorage or seed and background auto-sync
   useEffect(() => {
+    // A. First, load from local storage to show data instantly
     const local = localStorage.getItem("game_events_config");
     if (local) {
       try {
@@ -136,11 +173,34 @@ function App() {
       localStorage.setItem("game_events_config", JSON.stringify(initialEvents));
     }
 
-    // Trigger auto-sync if URL is configured
-    const savedUrl = localStorage.getItem("google_sheet_sync_url") || DEFAULT_GOOGLE_SHEET_URL;
-    if (savedUrl) {
-      syncWithGoogleSheet(savedUrl);
-    }
+    // B. Then, check the cloud database for the active Google Sheet URL and sync
+    const fetchActiveSheetAndSync = async () => {
+      let targetUrl = DEFAULT_GOOGLE_SHEET_URL;
+
+      try {
+        // Query the secure KV store for the active sheet URL
+        const cloudResponse = await fetch(`https://keyvalue.immanuel.co/api/KeyVal/GetValue/9z9a0g3w/active_sheet_url`);
+        if (cloudResponse.ok) {
+          let cloudUrlText = await cloudResponse.text();
+          const cloudUrl = fromHex(cloudUrlText);
+          if (cloudUrl && cloudUrl.startsWith("http")) {
+            targetUrl = cloudUrl;
+            console.log("Loaded active Google Sheet URL from cloud database:", targetUrl);
+          }
+        }
+      } catch (e) {
+        console.warn("Could not fetch active sheet URL from cloud, using default/cached:", e);
+        // Fall back to local storage URL if available
+        const localUrl = localStorage.getItem("google_sheet_sync_url");
+        if (localUrl) targetUrl = localUrl;
+      }
+
+      if (targetUrl) {
+        syncWithGoogleSheet(targetUrl, false);
+      }
+    };
+
+    fetchActiveSheetAndSync();
   }, []);
 
   // 2.5 Unified Filtered Events selector (shared globally across Dashboard, Timeline and Calendar)
