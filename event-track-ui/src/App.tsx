@@ -71,7 +71,7 @@ function App() {
   const [notice, setNotice] = useState("");
 
   // Option to configure a default team-wide Google Sheet URL for instant sync
-  const DEFAULT_GOOGLE_SHEET_URL = "";
+  const DEFAULT_GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQfO098G7uv1O2Z1-4HmPKqBK6rB39uKARvEcnty82HIIM72WVhMfoA9aine0K8jzar-8mTLGX8pc2z/pub?gid=1725209412&single=true&output=csv";
 
   const [googleSheetUrl, setGoogleSheetUrl] = useState(() => {
     return localStorage.getItem("google_sheet_sync_url") || DEFAULT_GOOGLE_SHEET_URL || "";
