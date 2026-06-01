@@ -7,7 +7,7 @@ import { EventTimeline } from "./components/EventTimeline";
 import { EventCalendarView } from "./components/EventCalendarView";
 import { EventForm } from "./components/EventForm";
 import { CSVImportExport } from "./components/CSVImportExport";
-import { PDFReference } from "./components/PDFReference";
+import { PDFReference } from "./components/PDFReference";import { parseCSV, csvRowsToEvents } from "./utils/csvUtils";
 
 function App() {
   const [events, setEvents] = useState<GameEvent[]>([]);
@@ -70,7 +70,58 @@ function App() {
   // Quick notice triggers
   const [notice, setNotice] = useState("");
 
-  // 1. Initial Load from localStorage or seed
+  // Option to configure a default team-wide Google Sheet URL for instant sync
+  const DEFAULT_GOOGLE_SHEET_URL = "";
+
+  const [googleSheetUrl, setGoogleSheetUrl] = useState(() => {
+    return localStorage.getItem("google_sheet_sync_url") || DEFAULT_GOOGLE_SHEET_URL || "";
+  });
+  const [isAutoSyncing, setIsAutoSyncing] = useState(false);
+
+  // 2. Persist state changes to localStorage
+  const saveEventsList = (updatedList: GameEvent[]) => {
+    // Sort events by ID or name
+    const sorted = [...updatedList].sort((a, b) => a.id - b.id);
+    setEvents(sorted);
+    localStorage.setItem("game_events_config", JSON.stringify(sorted));
+  };
+
+  const syncWithGoogleSheet = async (url: string) => {
+    if (!url.trim()) return false;
+    setIsAutoSyncing(true);
+    try {
+      let cleanUrl = url.trim();
+      if (cleanUrl.includes("docs.google.com/spreadsheets") && !cleanUrl.includes("output=csv") && !cleanUrl.includes("pub?")) {
+        throw new Error("Invalid URL: This looks like a standard spreadsheet link. Publish as CSV (.csv) instead.");
+      }
+
+      const response = await fetch(cleanUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP status: ${response.status}`);
+      }
+      
+      const csvText = await response.text();
+      const rows = parseCSV(csvText);
+      const imported = csvRowsToEvents(rows);
+
+      if (imported.length === 0) {
+        throw new Error("No events parsed. Verify sheet headers.");
+      }
+
+      saveEventsList(imported);
+      localStorage.setItem("google_sheet_sync_url", cleanUrl);
+      showNotice(`Auto-synchronized ${imported.length} events from Google Sheets!`);
+      return true;
+    } catch (err) {
+      console.error("Google Sheets Auto-Sync failed:", err);
+      showNotice(`Auto-sync failed: ${(err as Error).message}. Loaded local offline cache.`);
+      return false;
+    } finally {
+      setIsAutoSyncing(false);
+    }
+  };
+
+  // 1. Initial Load from localStorage or seed and background auto-sync
   useEffect(() => {
     const local = localStorage.getItem("game_events_config");
     if (local) {
@@ -84,15 +135,13 @@ function App() {
       setEvents(initialEvents);
       localStorage.setItem("game_events_config", JSON.stringify(initialEvents));
     }
-  }, []);
 
-  // 2. Persist state changes to localStorage
-  const saveEventsList = (updatedList: GameEvent[]) => {
-    // Sort events by ID or name
-    const sorted = [...updatedList].sort((a, b) => a.id - b.id);
-    setEvents(sorted);
-    localStorage.setItem("game_events_config", JSON.stringify(sorted));
-  };
+    // Trigger auto-sync if URL is configured
+    const savedUrl = localStorage.getItem("google_sheet_sync_url") || DEFAULT_GOOGLE_SHEET_URL;
+    if (savedUrl) {
+      syncWithGoogleSheet(savedUrl);
+    }
+  }, []);
 
   // 2.5 Unified Filtered Events selector (shared globally across Dashboard, Timeline and Calendar)
   const filteredEvents = events.filter(e => {
@@ -352,7 +401,15 @@ function App() {
 
               {/* Data Portability Panel (CSV and Google Sheet import/export) */}
               <div className="border-t border-white/5 pt-8">
-                <CSVImportExport events={events} isAdmin={isAdmin} onImportEvents={handleImportEvents} />
+                <CSVImportExport 
+                  events={events} 
+                  isAdmin={isAdmin} 
+                  onImportEvents={handleImportEvents} 
+                  sheetUrl={googleSheetUrl}
+                  setSheetUrl={setGoogleSheetUrl}
+                  onSync={syncWithGoogleSheet}
+                  isSyncing={isAutoSyncing}
+                />
               </div>
             </>
           )}

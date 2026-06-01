@@ -7,11 +7,21 @@ interface CSVImportExportProps {
   events: GameEvent[];
   isAdmin: boolean;
   onImportEvents: (newEvents: GameEvent[]) => void;
+  sheetUrl: string;
+  setSheetUrl: (url: string) => void;
+  onSync: (url: string) => Promise<boolean>;
+  isSyncing: boolean;
 }
 
-export const CSVImportExport: React.FC<CSVImportExportProps> = ({ events, isAdmin, onImportEvents }) => {
-  const [sheetUrl, setSheetUrl] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+export const CSVImportExport: React.FC<CSVImportExportProps> = ({ 
+  events, 
+  isAdmin, 
+  onImportEvents,
+  sheetUrl,
+  setSheetUrl,
+  onSync,
+  isSyncing
+}) => {
   const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error" | ""; text: string }>({ type: "", text: "" });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -66,38 +76,24 @@ export const CSVImportExport: React.FC<CSVImportExportProps> = ({ events, isAdmi
       return;
     }
 
-    setIsLoading(true);
     setStatusMsg({ type: "", text: "" });
 
     try {
-      // Basic sanitization: if user gives standard Google Sheet sharing link, warn them to publish as CSV
+      // Basic sanitization
       let cleanUrl = sheetUrl.trim();
       if (cleanUrl.includes("docs.google.com/spreadsheets") && !cleanUrl.includes("output=csv") && !cleanUrl.includes("pub?")) {
-        showStatus("error", "This looks like a standard spreadsheet view link. Please follow the instructions below to publish as CSV (.csv).");
-        setIsLoading(false);
+        showStatus("error", "This looks like a standard spreadsheet link. Publish as CSV (.csv) instead.");
         return;
       }
 
-      const response = await fetch(cleanUrl);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const csvText = await response.text();
-      const rows = parseCSV(csvText);
-      const imported = csvRowsToEvents(rows);
-
-      if (imported.length === 0) {
-        showStatus("error", "No records found. Make sure the spreadsheet is published and contains correct event columns.");
+      const success = await onSync(cleanUrl);
+      if (success) {
+        showStatus("success", "Google Sheets synchronization successful!");
       } else {
-        onImportEvents(imported);
-        showStatus("success", `Google Sheets synchronization successful! Imported ${imported.length} events.`);
+        showStatus("error", "Sync failed. Loaded local offline cache instead.");
       }
     } catch (err) {
-      console.error(err);
-      showStatus("error", `Connection failed: Make sure the spreadsheet is published 'To the Web' and CORS requests are allowed.`);
-    } finally {
-      setIsLoading(false);
+      showStatus("error", `Sync failed: ${(err as Error).message}`);
     }
   };
 
@@ -178,10 +174,10 @@ export const CSVImportExport: React.FC<CSVImportExportProps> = ({ events, isAdmi
           </div>
           <button
             type="submit"
-            disabled={isLoading || !isAdmin}
+            disabled={isSyncing || !isAdmin}
             className={`px-5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl transition-all shadow-lg hover:shadow-emerald-600/10 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center shrink-0 min-w-[100px] ${!isAdmin ? "opacity-30 cursor-not-allowed hover:bg-emerald-600" : ""}`}
           >
-            {isLoading ? (
+            {isSyncing ? (
               <RefreshCw size={18} className="animate-spin" />
             ) : (
               <span>Sync now</span>
