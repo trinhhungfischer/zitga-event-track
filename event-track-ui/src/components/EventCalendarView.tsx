@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, Calendar, Layers, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, Layers, Clock, Download } from "lucide-react";
 import type { GameEvent, ScheduledOccurrence } from "../types";
 import { getEventActiveWindows, toFriendlyString } from "../utils/dateUtils";
 
@@ -90,6 +90,48 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({ events, is
       return prev + 1;
     });
     setSelectedDay(1);
+  };
+
+  // CSV Exporter for Monthly Grid Calendar (event_date, event_modules, event_modules_season)
+  const handleExportMonthGrid = () => {
+    const headers = ["event_date", "event_modules", "event_modules_season"];
+    const rows: string[][] = [];
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const padDay = String(day).padStart(2, "0");
+      const padMonth = String(selectedMonth + 1).padStart(2, "0");
+      const dateStr = `${selectedYear}-${padMonth}-${padDay}`;
+
+      const occurrences = dayEventsMap[day] || [];
+      const modulesStr = occurrences.map(o => o.eventName).join("; ");
+      const seasonsStr = occurrences.map(o => `S${o.season}`).join("; ");
+
+      rows.push([dateStr, modulesStr, seasonsStr]);
+    }
+
+    const escapeCell = (val: string): string => {
+      if (!val) return "";
+      const str = String(val);
+      if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r") || str.includes(";")) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(r => r.map(escapeCell).join(","))
+    ].join("\r\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `event_calendar_${selectedYear}_${String(selectedMonth + 1).padStart(2, "0")}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // 4. Events active on the currently selected day
@@ -190,42 +232,53 @@ const getCustomColorSet = (type: string) => {
               <p className="text-xs text-slate-400">Click a day cell to list all running event modules below</p>
             </div>
 
-            {/* Month & Year Toggles */}
-            <div className="flex items-center bg-slate-900 border border-white/10 rounded-xl p-0.5 shadow-inner gap-1">
+            {/* Month & Year Toggles + Export Button */}
+            <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={handlePrevMonth}
-                className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
-                title="Previous Month"
+                onClick={handleExportMonthGrid}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-semibold transition-all shadow-sm active:scale-[0.98]"
+                title="Export current month calendar data to CSV"
               >
-                <ChevronLeft size={14} />
-              </button>
-              
-              <span className="w-20 text-center text-xs font-semibold text-white font-display">
-                {months[selectedMonth]}
-              </span>
-
-              <button
-                onClick={handleNextMonth}
-                className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
-                title="Next Month"
-              >
-                <ChevronRight size={14} />
+                <Download size={14} />
+                <span>Export CSV</span>
               </button>
 
-              <div className="h-4 w-[1px] bg-white/10 mx-0.5" />
+              <div className="flex items-center bg-slate-900 border border-white/10 rounded-xl p-0.5 shadow-inner gap-1">
+                <button
+                  onClick={handlePrevMonth}
+                  className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+                  title="Previous Month"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                
+                <span className="w-20 text-center text-xs font-semibold text-white font-display">
+                  {months[selectedMonth]}
+                </span>
 
-              <select
-                value={selectedYear}
-                onChange={(e) => {
-                  setSelectedYear(parseInt(e.target.value));
-                  setSelectedDay(1); // Reset day
-                }}
-                className="bg-transparent border-0 text-xs font-semibold text-white focus:outline-none pr-1.5 cursor-pointer font-mono-custom font-bold"
-              >
-                {[2025, 2026, 2027, 2028, 2029, 2030].map(y => (
-                  <option key={y} value={y} className="bg-slate-900 text-white font-semibold">{y}</option>
-                ))}
-              </select>
+                <button
+                  onClick={handleNextMonth}
+                  className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+                  title="Next Month"
+                >
+                  <ChevronRight size={14} />
+                </button>
+
+                <div className="h-4 w-[1px] bg-white/10 mx-0.5" />
+
+                <select
+                  value={selectedYear}
+                  onChange={(e) => {
+                    setSelectedYear(parseInt(e.target.value));
+                    setSelectedDay(1); // Reset day
+                  }}
+                  className="bg-transparent border-0 text-xs font-semibold text-white focus:outline-none pr-1.5 cursor-pointer font-mono-custom font-bold"
+                >
+                  {[2025, 2026, 2027, 2028, 2029, 2030].map(y => (
+                    <option key={y} value={y} className="bg-slate-900 text-white font-semibold">{y}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
